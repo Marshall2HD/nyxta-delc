@@ -8,7 +8,7 @@
 set -e
 
 # --- Configuration ---
-ALPINE_VERSION="3.22.0" # Check for the latest version at https://alpinelinux.org/downloads/
+ALPINE_VERSION="3.22.0"
 ALPINE_IMAGE_URL="https://dl-cdn.alpinelinux.org/alpine/v${ALPINE_VERSION%.*}/releases/armv7/alpine-rpi-${ALPINE_VERSION}-armv7.tar.gz"
 IMAGE_FILE=$(basename "$ALPINE_IMAGE_URL")
 MOUNT_POINT=$(mktemp -d)
@@ -38,11 +38,11 @@ trap cleanup EXIT
 # 1. Download Alpine Image
 if [ ! -f "$IMAGE_FILE" ]; then
   echo "--- Downloading Alpine Linux for Raspberry Pi (aarch64) ---"
-  curl -L "$ALPINE_IMAGE_URL" -o "$IMAGE_FILE"
+  curl -L -O "$ALPINE_IMAGE_URL"
   
   echo "--- Verifying checksum ---"
   # Download the checksum file
-  curl -L "${ALPINE_IMAGE_URL}.sha256" -o "${IMAGE_FILE}.sha256"
+  curl -L -O "${ALPINE_IMAGE_URL}.sha256"
   
   # Verify the checksum
   if ! shasum -a 256 -c "${IMAGE_FILE}.sha256"; then
@@ -80,7 +80,6 @@ diskutil unmountDisk "$DISK"
 echo "--- Writing image to $DISK (this may take a while) ---"
 # We don't use dd, we extract directly to the disk which should be formatted as FAT32
 # This is the standard Alpine diskless mode setup.
-tar -xzf "$IMAGE_FILE" -C "$MOUNT_POINT" --strip-components=0
 diskutil unmountDisk "$DISK"
 echo "Please format the SD card to FAT32 using Disk Utility and name it 'NYXTA'."
 echo "Press enter when you are ready to continue..."
@@ -102,11 +101,16 @@ printf "Enter hostname (e.g., nyxta-pi): "
 read -r HOSTNAME
 printf "Enter SSH public key (paste content or provide a URL like https://github.com/user.keys): "
 read -r SSH_KEY
+if echo "$SSH_KEY" | grep -q '^https://'; then
+  SSH_KEY=$(curl -fsSL "$SSH_KEY")
+fi
 printf "Enter your SOPS AGE private key (it will be stored on the boot partition): "
 read -r SOPS_AGE_KEY
 
 # 6. Inject configuration
 echo "--- Injecting configuration files ---"
+
+# NOTE: user-conf.yml stores sensitive secrets and is world-readable unless encrypted or removed.
 
 # Create user-conf.yml for Alpine's setup script
 cat > "${MOUNT_POINT}/user-conf.yml" <<EOF
