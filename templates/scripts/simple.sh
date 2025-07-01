@@ -77,17 +77,14 @@ fi
 # 3. Burn Image
 echo "--- Unmounting disk $DISK before writing ---"
 diskutil unmountDisk "$DISK"
+echo "--- Formatting disk $DISK as FAT32 with name NYXTA ---"
+diskutil eraseDisk FAT32 NYXTA MBRFormat "$DISK"
+
 echo "--- Writing image to $DISK (this may take a while) ---"
-# We don't use dd, we extract directly to the disk which should be formatted as FAT32
-# This is the standard Alpine diskless mode setup.
-diskutil unmountDisk "$DISK"
-echo "Please format the SD card to FAT32 using Disk Utility and name it 'NYXTA'."
-echo "Press enter when you are ready to continue..."
-read -r < /dev/tty
 # The SD card is now expected to be mounted at /Volumes/NYXTA
 MOUNT_POINT="/Volumes/NYXTA"
 if [ ! -d "$MOUNT_POINT" ]; then
-    echo "Mount point /Volumes/NYXTA not found. Aborting."
+    echo "Mount point /Volumes/NYXTA not found after formatting. Aborting."
     exit 1
 fi
 tar -xzf "$IMAGE_FILE" -C "$MOUNT_POINT" --strip-components=0
