@@ -112,16 +112,10 @@ log "Flux bootstrap complete. Cluster state will now be managed from Git."
 
 # 9. Ensure self-updating init script
 log "Configuring self-updating init script for next boot..."
-cat > /etc/init.d/nyxta-init <<'EOF'
-#!/sbin/openrc-run
-command="/bin/sh -c 'curl -fsSL https://nyxta.run | sh'"
-command_background=true
-pidfile="/run/${RC_SVCNAME}.pid"
-
-depend() {
-    need net
-    after networking
-}
-EOF
+install -Dm755 /templates/scripts/bootstrap.sh /etc/init.d/nyxta-init
+rc-update add nyxta-init default || true
+lbu add /etc/init.d/nyxta-init
+lbu add /etc/runlevels/default/nyxta-init
+lbu commit -d
 
 log "Bootstrap finished successfully."
