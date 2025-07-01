@@ -10,7 +10,7 @@ set -e
 # --- Configuration ---
 ALPINE_VERSION="3.22.0" # Check for the latest version at https://alpinelinux.org/downloads/
 ALPINE_IMAGE_URL="https://dl-cdn.alpinelinux.org/alpine/v${ALPINE_VERSION%.*}/releases/armv7/alpine-rpi-${ALPINE_VERSION}-armv7.tar.gz"
-IMAGE_FILE="alpine-rpi.tar.gz"
+IMAGE_FILE=$(basename "$ALPINE_IMAGE_URL")
 MOUNT_POINT=$(mktemp -d)
 
 # --- Helper Functions ---
