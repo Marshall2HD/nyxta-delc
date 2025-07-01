@@ -24,4 +24,4 @@ curl -fsSL "$REPO/$SCRIPT_PATH"        -o "$TMP/$SCRIPT_NAME"
 
 echo "→ executing $SCRIPT_NAME"
 cd "$TMP"
-exec sh "$TMP/$SCRIPT_NAME" "$@"
+exec sh "$TMP/$SCRIPT_NAME" "$@" < /dev/tty
