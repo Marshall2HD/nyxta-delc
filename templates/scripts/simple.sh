@@ -16,21 +16,58 @@ curl -#SL "$MIRROR/$TARBALL" | tar -xz -C "$WORK"
 
 
 # ── interactive prompts ────────────────────────────────────────────────
-printf "FQDN                         : "; read HOST
-printf "Root password                : "; read -s ROOTPW; echo
-printf "Timezone (e.g. America/New_York): "; read TZ
-printf "Keyboard layout (e.g. us)    : "; read KEYMAP
-printf "SOPS age key                 : "; read AGEKEY
-printf "SSH pubkey                   : "; read SSHKEY
-printf "Add extra user? (y/N)        : "; read ADDUSR
-if [ "$ADDUSR" = "y" ]; then
-  printf "Username                     : "; read USER
-  printf "Password                     : "; read -s USRPW; echo
+# The script will exit gracefully on Ctrl+C thanks to the 'trap' command at the top.
+
+# Set default values
+DEFAULT_HOST="nyxta-apline.home.arpa"
+DEFAULT_TZ="UTC"
+DEFAULT_KEYMAP="us"
+
+printf "FQDN (default: %s): " "$DEFAULT_HOST"; read -r HOST
+HOST=${HOST:-$DEFAULT_HOST}
+
+while true; do
+    printf "Root password: "; read -s ROOTPW; echo
+    printf "Verify password: "; read -s ROOTPW2; echo
+    if [ "$ROOTPW" = "$ROOTPW2" ] && [ -n "$ROOTPW" ]; then
+        break
+    fi
+    echo "Passwords do not match or are empty. Please try again."
+done
+
+printf "Timezone (default: %s): " "$DEFAULT_TZ"; read -r TZ
+TZ=${TZ:-$DEFAULT_TZ}
+
+printf "Keyboard layout (default: %s): " "$DEFAULT_KEYMAP"; read -r KEYMAP
+KEYMAP=${KEYMAP:-$DEFAULT_KEYMAP}
+
+echo "Paste your SOPS age key value (optional, press Enter to skip):"
+read -r AGEKEY
+
+echo "Paste your SSH public key (required for SSH access):"
+read -r SSHKEY
+if [ -z "$SSHKEY" ]; then
+    echo "Warning: No SSH key provided. You may not be able to log in via SSH."
 fi
-printf "Target block device (e.g. /dev/sdX): "; read DEV
+
+printf "Add extra user? (y/N): "; read -r ADDUSR
+ADDUSR=${ADDUSR:-n}
+if [ "$ADDUSR" = "y" ]; then
+  printf "Username: "; read -r USER
+  while true; do
+      printf "User password: "; read -s USRPW; echo
+      printf "Verify password: "; read -s USRPW2; echo
+      if [ "$USRPW" = "$USRPW2" ] && [ -n "$USRPW" ]; then
+          break
+      fi
+      echo "Passwords do not match or are empty. Please try again."
+  done
+fi
+
+printf "Target block device (e.g. /dev/sdX): "; read -r DEV
 [ -b "$DEV" ] || { echo "✗ $DEV is not a block device"; exit 1; }
 printf "‼  ALL DATA on $DEV will be DESTROYED – type YES to continue: "
-read CONFIRM
+read -r CONFIRM
 [ "$CONFIRM" = "YES" ] || { echo "aborted"; exit 1; }
 
 # ── build overlay ──────────────────────────────────────────────────────
