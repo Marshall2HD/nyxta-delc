@@ -2,19 +2,6 @@
 #!/usr/bin/env sh
 set -eu
 
-ARCH="aarch64"                     # change to armv7 for Pi 3/Zero
-ALPINE_VER="3.22.0"
-TARBALL="alpine-rpi-${ALPINE_VER}-${ARCH}.tar.gz"
-MIRROR="https://dl-cdn.alpinelinux.org/alpine/v${ALPINE_VER%.*}/releases/${ARCH}"
-
-WORK=$(mktemp -d)
-OVERLAY=$(mktemp -d)
-trap 'rm -rf "$WORK" "$OVERLAY"' EXIT INT TERM
-
-# simple.sh
-#!/usr/bin/env sh
-set -eu
-
 ARCH="armv7"                     # change to armv7 for Pi 3/Zero
 ALPINE_VER="3.22.0"
 TARBALL="alpine-rpi-${ALPINE_VER}-${ARCH}.tar.gz"
@@ -23,9 +10,6 @@ MIRROR="https://dl-cdn.alpinelinux.org/alpine/v${ALPINE_VER%.*}/releases/${ARCH}
 WORK=$(mktemp -d)
 OVERLAY=$(mktemp -d)
 trap 'rm -rf "$WORK" "$OVERLAY"' EXIT INT TERM
-
-echo "→ verifying Alpine tarball"
-curl -fsSL "$MIRROR/$TARBALL.sha256" | sha256sum -c -
 
 echo "→ downloading Alpine rootfs"
 curl -#SL "$MIRROR/$TARBALL" | tar -xz -C "$WORK"
