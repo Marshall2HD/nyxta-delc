@@ -1,6 +1,10 @@
 #!/bin/sh
 # Entry script for nyxta.run — decides which script to fetch
 
+command_exists() {
+    command -v "$1" >/dev/null 2>&1
+}
+
 SCRIPT_NAME="bootstrap.sh"
 if [ "$1" = "--simple" ]; then
   SCRIPT_NAME="simple.sh"
@@ -23,7 +27,16 @@ if [ -z "${EXPECTED_SHA}" ]; then
   exit 1
 fi
 
-ACTUAL_SHA=$(sha256sum "${TMP_SCRIPT}" | awk '{print $1}')
+ACTUAL_SHA=""
+if command_exists sha256sum; then
+  ACTUAL_SHA=$(sha256sum "${TMP_SCRIPT}" | awk '{print $1}')
+elif command_exists shasum; then
+  ACTUAL_SHA=$(shasum -a 256 "${TMP_SCRIPT}" | awk '{print $1}')
+else
+  echo "[!] Neither sha256sum nor shasum found. Cannot verify script integrity." >&2
+  rm "${TMP_SCRIPT}"
+  exit 1
+fi
 
 if [ "$ACTUAL_SHA" != "$EXPECTED_SHA" ]; then
   echo "[!] SHA mismatch for ${SCRIPT_NAME}" >&2
