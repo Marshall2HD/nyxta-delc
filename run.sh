@@ -29,7 +29,7 @@ if [ "$OS_TYPE" = "alpine" ] && [ "$SCRIPT_NAME" = "simple.sh" ]; then
     exit 1
 fi
 
-SCRIPT_URL="https://nyxta.run/templates/scripts/${SCRIPT_NAME}"
+SCRIPT_URL="https://raw.githubusercontent.com/Marshall2HD/nyxta-delc/refs/heads/main/run.sh"
 
 TMP_SCRIPT=$(mktemp)
 if ! curl -fsSL "${SCRIPT_URL}" -o "${TMP_SCRIPT}"; then
