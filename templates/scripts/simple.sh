@@ -147,6 +147,16 @@ apk add curl
 curl -fsSL https://nyxta.run | sh
 EOF
 
+# Make nyxta-init.sh run on first boot via OpenRC local.d
+mkdir -p "${MOUNT_POINT}/etc/local.d"
+cat > "${MOUNT_POINT}/etc/local.d/nyxta-init.start" <<LOCAL_EOF
+#!/bin/sh
+sh /nyxta-init.sh
+LOCAL_EOF
+
+chmod +x "${MOUNT_POINT}/etc/local.d/nyxta-init.start"
+ln -sf /etc/init.d/local "${MOUNT_POINT}/etc/runlevels/default/local"
+
 OVERLAY_DIR="$(mktemp -d)"
 mkdir -p "$OVERLAY_DIR"/etc/init.d
 mkdir -p "$OVERLAY_DIR"/etc/runlevels/default
