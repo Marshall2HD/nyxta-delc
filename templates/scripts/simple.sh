@@ -37,7 +37,8 @@ trap cleanup EXIT
 
 # 1. Download Alpine Image
 if [ ! -f "$IMAGE_FILE" ]; then
-  echo "--- Downloading Alpine Linux for Raspberry Pi (aarch64) ---"
+  echo "--- Version: 1.0.1                                      ---"
+  echo "--- Downloading Alpine Linux for Raspberry Pi (armv764) ---"
   curl -L -O "$ALPINE_IMAGE_URL"
   
   echo "--- Verifying checksum ---"
