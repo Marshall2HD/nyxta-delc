@@ -1,164 +1,109 @@
-#!/bin/sh
-#
-# nyxta-simple: Headless Alpine Pi Image Builder
-#
-# This script is designed to be run on your laptop or desktop.
-# It prepares a bootable Alpine Linux SD card for a Raspberry Pi.
+# simple.sh
+#!/usr/bin/env sh
+set -eu
 
-set -e
+ARCH="aarch64"                     # change to armv7 for Pi 3/Zero
+ALPINE_VER="3.22.0"
+TARBALL="alpine-rpi-${ALPINE_VER}-${ARCH}.tar.gz"
+MIRROR="https://dl-cdn.alpinelinux.org/alpine/v${ALPINE_VER%.*}/releases/${ARCH}"
 
-# --- Configuration ---
-ALPINE_VERSION="3.22.0"
-ALPINE_IMAGE_URL="https://dl-cdn.alpinelinux.org/alpine/v${ALPINE_VERSION%.*}/releases/armv7/alpine-rpi-${ALPINE_VERSION}-armv7.tar.gz"
-IMAGE_FILE=$(basename "$ALPINE_IMAGE_URL")
-MOUNT_POINT=$(mktemp -d)
+WORK=$(mktemp -d)
+OVERLAY=$(mktemp -d)
+trap 'rm -rf "$WORK" "$OVERLAY"' EXIT INT TERM
 
-# --- Helper Functions ---
-cleanup() {
-  set +e
-  echo "--- Cleaning up ---"
-  if [ -d "$MOUNT_POINT" ]; then
-    DEVICE_IDENTIFIER=$(df "$MOUNT_POINT" | awk 'NR==2 {print $1}')
-    if [ -n "$DEVICE_IDENTIFIER" ]; then
-        DISK_NAME=$(echo "$DEVICE_IDENTIFIER" | sed 's/s[0-9]*$//')
-        echo "Unmounting $MOUNT_POINT..."
-        umount "$MOUNT_POINT"
-        echo "Ejecting $DISK_NAME..."
-        diskutil eject "$DISK_NAME"
-    fi
-  fi
-  rm -rf "$MOUNT_POINT"
-  rm -f "$IMAGE_FILE"
-  echo "Cleanup complete."
-}
-trap cleanup EXIT
+# simple.sh
+#!/usr/bin/env sh
+set -eu
 
-# --- Main Script ---
+ARCH="armv7"                     # change to armv7 for Pi 3/Zero
+ALPINE_VER="3.22.0"
+TARBALL="alpine-rpi-${ALPINE_VER}-${ARCH}.tar.gz"
+MIRROR="https://dl-cdn.alpinelinux.org/alpine/v${ALPINE_VER%.*}/releases/${ARCH}"
 
-# 1. Download Alpine Image
-if [ ! -f "$IMAGE_FILE" ]; then
-  echo "--- Version: 1.0.1                                      ---"
-  echo "--- Downloading Alpine Linux for Raspberry Pi (armv764) ---"
-  curl -L -O "$ALPINE_IMAGE_URL"
-  
-  echo "--- Verifying checksum ---"
-  # Download the checksum file
-  curl -L -O "${ALPINE_IMAGE_URL}.sha256"
-  
-  # Verify the checksum
-  if ! shasum -a 256 -c "${IMAGE_FILE}.sha256"; then
-    echo "[!] Checksum validation failed. Aborting." >&2
-    rm "$IMAGE_FILE" "${IMAGE_FILE}.sha256"
-    exit 1
-  fi
-  echo "--- Checksum verified ---"
-  rm "${IMAGE_FILE}.sha256"
+WORK=$(mktemp -d)
+OVERLAY=$(mktemp -d)
+trap 'rm -rf "$WORK" "$OVERLAY"' EXIT INT TERM
 
-else
-  echo "--- Alpine image already downloaded ---"
+echo "→ verifying Alpine tarball"
+curl -fsSL "$MIRROR/$TARBALL.sha256" | sha256sum -c -
+
+echo "→ downloading Alpine rootfs"
+curl -#SL "$MIRROR/$TARBALL" | tar -xz -C "$WORK"
+
+
+# ── interactive prompts ────────────────────────────────────────────────
+printf "FQDN                         : "; read HOST
+printf "Root password                : "; read -s ROOTPW; echo
+printf "Timezone (e.g. America/New_York): "; read TZ
+printf "Keyboard layout (e.g. us)    : "; read KEYMAP
+printf "SOPS age key                 : "; read AGEKEY
+printf "SSH pubkey                   : "; read SSHKEY
+printf "Add extra user? (y/N)        : "; read ADDUSR
+if [ "$ADDUSR" = "y" ]; then
+  printf "Username                     : "; read USER
+  printf "Password                     : "; read -s USRPW; echo
 fi
+printf "Target block device (e.g. /dev/sdX): "; read DEV
+[ -b "$DEV" ] || { echo "✗ $DEV is not a block device"; exit 1; }
+printf "‼  ALL DATA on $DEV will be DESTROYED – type YES to continue: "
+read CONFIRM
+[ "$CONFIRM" = "YES" ] || { echo "aborted"; exit 1; }
 
-# 2. Select Disk
-echo "--- Please select the disk to write to ---"
-diskutil list external
-echo "Enter the disk identifier (e.g., /dev/disk4):"
-read -r DISK < /dev/tty
-if [ -z "$DISK" ]; then
-  echo "No disk selected. Aborting."
-  exit 1
-fi
+# ── build overlay ──────────────────────────────────────────────────────
+mkdir -p "$OVERLAY"/{etc,root/.ssh,root/.sops,etc/network/interfaces.d}
 
-echo "WARNING: This will erase all data on $DISK. Are you sure? (y/N)"
-read -r CONFIRM < /dev/tty
-if [ "$CONFIRM" != "y" ]; then
-  echo "Aborting."
-  exit 1
-fi
-
-# 3. Burn Image
-echo "--- Unmounting disk $DISK before writing ---"
-diskutil unmountDisk "$DISK"
-echo "--- Formatting disk $DISK as FAT32 with name NYXTA ---"
-diskutil eraseDisk FAT32 NYXTA MBRFormat "$DISK"
-
-echo "--- Writing image to $DISK (this may take a while) ---"
-# The SD card is now expected to be mounted at /Volumes/NYXTA
-MOUNT_POINT="/Volumes/NYXTA"
-if [ ! -d "$MOUNT_POINT" ]; then
-    echo "Mount point /Volumes/NYXTA not found after formatting. Aborting."
-    exit 1
-fi
-tar -xzf "$IMAGE_FILE" -C "$MOUNT_POINT" --strip-components=0
-
-
-# 5. Prompt for configuration
-echo "--- Configuring the system ---"
-
-printf "Enter new root password (input will be hidden): "
-stty -echo
-read -r ROOT_PASSWORD < /dev/tty
-stty echo
-printf "\n"
-
-printf "Enter hostname (e.g., nyxta-pi, not a fully qualified domain name): "
-read -r HOSTNAME < /dev/tty
-
-printf "Enter SSH public key (paste content or provide a URL like https://github.com/user.keys): "
-read -r SSH_KEY < /dev/tty
-if echo "$SSH_KEY" | grep -q '^https://'; then
-  SSH_KEY=$(curl -fsSL "$SSH_KEY")
-fi
-
-printf "Enter your SOPS AGE private key (the long string starting with 'AGE-SECRET-KEY-'): "
-read -r SOPS_AGE_KEY < /dev/tty
-
-# Ask to create a new user
-printf "Do you want to create a new non-root user? (y/N): "
-read -r CREATE_USER_CONFIRM < /dev/tty
-if [ "$CREATE_USER_CONFIRM" = "y" ]; then
-    printf "Enter username for the new user: "
-    read -r NEW_USERNAME < /dev/tty
-    printf "Enter password for %s (input will be hidden): " "$NEW_USERNAME"
-    stty -echo
-    read -r NEW_USER_PASSWORD < /dev/tty
-    stty echo
-    printf "\n"
-fi
-
-# 6. Inject configuration
-echo "--- Injecting configuration files ---"
-
-# Create user-conf.yml for Alpine's setup script
-cat > "${MOUNT_POINT}/user-conf.yml" <<EOF
-# user-conf.yml
-hostname: ${HOSTNAME}
-password: ${ROOT_PASSWORD}
-ssh_key: "${SSH_KEY}"
-sops_age_key: "${SOPS_AGE_KEY}"
-new_username: "${NEW_USERNAME}"
-new_user_password: "${NEW_USER_PASSWORD}"
+echo "$HOST"                    > "$OVERLAY/etc/hostname"
+cat > "$OVERLAY/etc/hosts" <<EOF
+127.0.0.1   localhost
+127.0.1.1   $HOST
 EOF
 
-# Create the init script
-cat > "${MOUNT_POINT}/nyxta-init.sh" <<EOF
-#!/bin/sh
-# This script runs on first boot to finalize setup.
-apk add curl
-curl -fsSL https://nyxta.run | sh
+echo "$TZ"                      > "$OVERLAY/etc/timezone"
+ln -sf "/usr/share/zoneinfo/$TZ" "$OVERLAY/etc/localtime"
+echo "keymap=\"$KEYMAP\""       > "$OVERLAY/etc/conf.d/keymaps"
+
+echo "$SSHKEY"                  > "$OVERLAY/root/.ssh/authorized_keys"
+chmod 600 "$OVERLAY/root/.ssh/authorized_keys"
+
+cat > "$OVERLAY/etc/network/interfaces.d/eth0" <<EOF
+auto eth0
+iface eth0 inet dhcp
 EOF
 
-# Make nyxta-init.sh run on first boot via OpenRC local.d
-mkdir -p "${MOUNT_POINT}/etc/local.d"
-cat > "${MOUNT_POINT}/etc/local.d/nyxta-init.start" <<LOCAL_EOF
-#!/bin/sh
-sh /nyxta-init.sh
-LOCAL_EOF
+echo "$AGEKEY"                  > "$OVERLAY/root/.sops/age.key"
+chmod 600 "$OVERLAY/root/.sops/age.key"
 
-chmod +x "${MOUNT_POINT}/etc/local.d/nyxta-init.start"
-ln -sf /etc/init.d/local "${MOUNT_POINT}/etc/runlevels/default/local"
+if [ "$ADDUSR" = "y" ]; then
+  chroot "$WORK" apk add --no-cache sudo
+  chroot "$WORK" addgroup "$USER" wheel
+  chroot "$WORK" adduser -D -G wheel -s /bin/ash "$USER"
+  echo "$USER:$USRPW" | chroot "$WORK" chpasswd
+  mkdir -p "$OVERLAY/etc/sudoers.d"
+  echo "%wheel ALL=(ALL) NOPASSWD: ALL" > "$OVERLAY/etc/sudoers.d/wheel"
+fi
 
-echo "--- Configuration complete ---"
+# ── merge overlay & enable services ────────────────────────────────────
+cp -a "$OVERLAY/." "$WORK/"
+chroot "$WORK" apk add --no-cache openssh chrony
+chroot "$WORK" rc-update add sshd    default
+chroot "$WORK" rc-update add chronyd default
+echo "root:$ROOTPW" | chroot "$WORK" chpasswd
 
-# 7. Unmount
-# The cleanup function will handle unmounting and ejecting.
-echo "--- Setup finished. The SD card can now be safely removed. ---"
+# ── wipe & partition target disk ───────────────────────────────────────
+echo "→ wiping $DEV"
+dd if=/dev/zero of="$DEV" bs=1M count=10 status=progress
+sgdisk --zap-all "$DEV"
+parted -s "$DEV" mklabel gpt mkpart primary ext4 1MiB 100%
+
+echo "→ formatting ${DEV}1"
+mkfs.ext4 -F "${DEV}1"
+
+# ── copy prepared rootfs onto disk ─────────────────────────────────────
+MNT=$(mktemp -d)
+mount "${DEV}1" "$MNT"
+echo "→ copying files (this can take a while)"
+rsync -aHAX --info=progress2 "$WORK"/ "$MNT"/
+umount "$MNT"
+sync
+
+echo "✓ finished – insert card and boot the Pi"
