@@ -25,7 +25,9 @@ curl -fsSL "$REPO/$SCRIPT_PATH.sha256" -o "$TMP/$SCRIPT_NAME.sha256"
 
 echo "→ verifying checksum"
 cd "$TMP"
-sha256sum -c "$SCRIPT_NAME.sha256"
+# The checksum file contains the full path, but the script is in the current directory.
+# We'll adjust the path in the checksum file before verifying.
+sed "s#$SCRIPT_PATH#$SCRIPT_NAME#" "$SCRIPT_NAME.sha256" | sha256sum -c -
 
 echo "→ executing $SCRIPT_NAME"
 exec sh "$TMP/$SCRIPT_NAME" "$@"
