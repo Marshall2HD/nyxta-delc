@@ -75,7 +75,7 @@ read -r CONFIRM
 [ "$CONFIRM" = "YES" ] || { echo "aborted"; exit 1; }
 
 # ── build overlay ──────────────────────────────────────────────────────
-mkdir -p "$OVERLAY"/{etc,root/.ssh,root/.sops,etc/network/interfaces.d}
+mkdir -p "$OVERLAY"/{etc/{conf.d,network/interfaces.d,sudoers.d},root/{.sops,.ssh}}
 
 echo "$HOST"                    > "$OVERLAY/etc/hostname"
 cat > "$OVERLAY/etc/hosts" <<EOF
@@ -103,12 +103,27 @@ if [ "$ADDUSR" = "y" ]; then
   chroot "$WORK" addgroup "$USER" wheel
   chroot "$WORK" adduser -D -G wheel -s /bin/ash "$USER"
   echo "$USER:$USRPW" | chroot "$WORK" chpasswd
-  mkdir -p "$OVERLAY/etc/sudoers.d"
   echo "%wheel ALL=(ALL) NOPASSWD: ALL" > "$OVERLAY/etc/sudoers.d/wheel"
+
+  # Prepare SSH key for the new user in the overlay
+  if [ -n "$SSHKEY" ]; then
+      mkdir -p "$OVERLAY/home/$USER/.ssh"
+      echo "$SSHKEY" > "$OVERLAY/home/$USER/.ssh/authorized_keys"
+  fi
 fi
 
 # ── merge overlay & enable services ────────────────────────────────────
 cp -a "$OVERLAY/." "$WORK/"
+
+if [ "$ADDUSR" = "y" ]; then
+    # Fix permissions for the new user's home directory and SSH key
+    chroot "$WORK" chown -R "$USER:$USER" "/home/$USER"
+    if [ -n "$SSHKEY" ]; then
+        chroot "$WORK" chmod 700 "/home/$USER/.ssh"
+        chroot "$WORK" chmod 600 "/home/$USER/.ssh/authorized_keys"
+    fi
+fi
+
 chroot "$WORK" apk add --no-cache openssh chrony
 chroot "$WORK" rc-update add sshd    default
 chroot "$WORK" rc-update add chronyd default
