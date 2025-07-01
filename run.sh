@@ -69,6 +69,8 @@ if [ "$ACTUAL_SHA" != "$EXPECTED_SHA" ]; then
   exit 1
 fi
 
-sh "${TMP_SCRIPT}" "$@"
+# Execute the script, but redirect stdin from /dev/tty
+# to ensure it can read user input interactively.
+sh "${TMP_SCRIPT}" "$@" < /dev/tty
 
 rm "${TMP_SCRIPT}"
