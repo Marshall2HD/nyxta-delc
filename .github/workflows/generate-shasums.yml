@@ -7,6 +7,9 @@ on:
       - "templates/scripts/**.sh"
   workflow_dispatch:
 
+permissions:
+  contents: write
+
 jobs:
   generate-shasums:
     runs-on: ubuntu-latest
