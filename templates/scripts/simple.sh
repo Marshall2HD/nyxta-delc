@@ -61,14 +61,14 @@ fi
 echo "--- Please select the disk to write to ---"
 diskutil list external
 echo "Enter the disk identifier (e.g., /dev/disk4):"
-read -r DISK
+read -r DISK < /dev/tty
 if [ -z "$DISK" ]; then
   echo "No disk selected. Aborting."
   exit 1
 fi
 
 echo "WARNING: This will erase all data on $DISK. Are you sure? (y/N)"
-read -r CONFIRM
+read -r CONFIRM < /dev/tty
 if [ "$CONFIRM" != "y" ]; then
   echo "Aborting."
   exit 1
@@ -83,7 +83,7 @@ echo "--- Writing image to $DISK (this may take a while) ---"
 diskutil unmountDisk "$DISK"
 echo "Please format the SD card to FAT32 using Disk Utility and name it 'NYXTA'."
 echo "Press enter when you are ready to continue..."
-read -r
+read -r < /dev/tty
 # The SD card is now expected to be mounted at /Volumes/NYXTA
 MOUNT_POINT="/Volumes/NYXTA"
 if [ ! -d "$MOUNT_POINT" ]; then
@@ -96,16 +96,16 @@ tar -xzf "$IMAGE_FILE" -C "$MOUNT_POINT" --strip-components=0
 # 5. Prompt for configuration
 echo "--- Configuring the system ---"
 printf "Enter new root password: "
-read -r ROOT_PASSWORD
+read -r ROOT_PASSWORD < /dev/tty
 printf "Enter hostname (e.g., nyxta-pi): "
-read -r HOSTNAME
+read -r HOSTNAME < /dev/tty
 printf "Enter SSH public key (paste content or provide a URL like https://github.com/user.keys): "
-read -r SSH_KEY
+read -r SSH_KEY < /dev/tty
 if echo "$SSH_KEY" | grep -q '^https://'; then
   SSH_KEY=$(curl -fsSL "$SSH_KEY")
 fi
 printf "Enter your SOPS AGE private key (it will be stored on the boot partition): "
-read -r SOPS_AGE_KEY
+read -r SOPS_AGE_KEY < /dev/tty
 
 # 6. Inject configuration
 echo "--- Injecting configuration files ---"
