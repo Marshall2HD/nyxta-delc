@@ -2,6 +2,12 @@
 #!/usr/bin/env sh
 set -eu
 
+# --- Root Check ---
+if [ "$(id -u)" -ne 0 ]; then
+    echo "This script requires root privileges. Re-running with sudo..."
+    exec sudo "$0" "$@"
+fi
+
 ARCH="armv7"                     # change to armv7 for Pi 3/Zero
 ALPINE_VER="3.22.0"
 TARBALL="alpine-rpi-${ALPINE_VER}-${ARCH}.tar.gz"
