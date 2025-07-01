@@ -157,32 +157,6 @@ LOCAL_EOF
 chmod +x "${MOUNT_POINT}/etc/local.d/nyxta-init.start"
 ln -sf /etc/init.d/local "${MOUNT_POINT}/etc/runlevels/default/local"
 
-OVERLAY_DIR="$(mktemp -d)"
-mkdir -p "$OVERLAY_DIR"/etc/init.d
-mkdir -p "$OVERLAY_DIR"/etc/runlevels/default
-mkdir -p "$OVERLAY_DIR"/usr/local/bin
-
-cp "${MOUNT_POINT}/nyxta-bootstrap.sh" "$OVERLAY_DIR/usr/local/bin/"
-chmod +x "$OVERLAY_DIR/usr/local/bin/nyxta-bootstrap.sh"
-
-cat > "$OVERLAY_DIR/etc/init.d/nyxta-init" <<'INIT_EOF'
-#!/sbin/openrc-run
-command="/usr/local/bin/nyxta-bootstrap.sh"
-command_background=true
-pidfile="/run/${RC_SVCNAME}.pid"
-
-depend() {
-    need net
-    after networking
-}
-INIT_EOF
-
-chmod +x "$OVERLAY_DIR/etc/init.d/nyxta-init"
-ln -s /etc/init.d/nyxta-init "$OVERLAY_DIR/etc/runlevels/default/nyxta-init"
-
-(cd "$OVERLAY_DIR" && tar -czf "${MOUNT_POINT}/apkovl.tar.gz" .)
-rm -rf "$OVERLAY_DIR"
-
 echo "--- Configuration complete ---"
 
 # 7. Unmount
