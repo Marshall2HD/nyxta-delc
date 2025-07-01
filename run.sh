@@ -3,7 +3,7 @@
 set -eu
 
 REPO="https://raw.githubusercontent.com/Marshall2HD/nyxta-delc/refs/heads/main/"
-SCRIPT="bootstrap.sh"
+SCRIPT="templates/scripts/bootstrap.sh"
 
 for arg in "$@"; do
   case "$arg" in
