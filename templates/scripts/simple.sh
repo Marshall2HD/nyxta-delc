@@ -30,6 +30,7 @@ while true; do
     printf "Root password: "; read -s ROOTPW; echo
     printf "Verify password: "; read -s ROOTPW2; echo
     if [ "$ROOTPW" = "$ROOTPW2" ] && [ -n "$ROOTPW" ]; then
+        echo "✓ Root password saved."
         break
     fi
     echo "Passwords do not match or are empty. Please try again."
@@ -58,13 +59,16 @@ if [ "$ADDUSR" = "y" ]; then
       printf "User password: "; read -s USRPW; echo
       printf "Verify password: "; read -s USRPW2; echo
       if [ "$USRPW" = "$USRPW2" ] && [ -n "$USRPW" ]; then
+          echo "✓ User password saved."
           break
       fi
       echo "Passwords do not match or are empty. Please try again."
   done
 fi
 
-printf "Target block device (e.g. /dev/sdX): "; read -r DEV
+echo "Available external disks:"
+diskutil list external
+printf "Target block device (e.g. /dev/disk4): "; read -r DEV
 [ -b "$DEV" ] || { echo "✗ $DEV is not a block device"; exit 1; }
 printf "‼  ALL DATA on $DEV will be DESTROYED – type YES to continue: "
 read -r CONFIRM
