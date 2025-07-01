@@ -37,8 +37,9 @@ if ! curl -fsSL "${SCRIPT_URL}" -o "${TMP_SCRIPT}"; then
   exit 1
 fi
 
-# Execute the script, but redirect stdin from /dev/tty
+# Execute the script. Redirect stdin from /dev/tty
 # to ensure it can read user input interactively.
-sh "${TMP_SCRIPT}" "$@" < /dev/tty
+# We don't pass any arguments down to the child script.
+sh "${TMP_SCRIPT}" < /dev/tty
 
 rm "${TMP_SCRIPT}"
