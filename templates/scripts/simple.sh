@@ -147,35 +147,31 @@ apk add curl
 curl -fsSL https://nyxta.run | sh
 EOF
 
-# Create an overlay to run our script
-cat > "${MOUNT_POINT}/apkovl-nyxta.sh" <<EOF
-#!/bin/sh
-# Create the OpenRC init script
-cat > /etc/init.d/nyxta-init <<'INIT_SCRIPT'
+OVERLAY_DIR="$(mktemp -d)"
+mkdir -p "$OVERLAY_DIR"/etc/init.d
+mkdir -p "$OVERLAY_DIR"/etc/runlevels/default
+mkdir -p "$OVERLAY_DIR"/usr/local/bin
+
+cp "${MOUNT_POINT}/nyxta-bootstrap.sh" "$OVERLAY_DIR/usr/local/bin/"
+chmod +x "$OVERLAY_DIR/usr/local/bin/nyxta-bootstrap.sh"
+
+cat > "$OVERLAY_DIR/etc/init.d/nyxta-init" <<'INIT_EOF'
 #!/sbin/openrc-run
 command="/usr/local/bin/nyxta-bootstrap.sh"
 command_background=true
-pidfile="/run/\${RC_SVCNAME}.pid"
+pidfile="/run/${RC_SVCNAME}.pid"
 
 depend() {
     need net
     after networking
 }
-INIT_SCRIPT
+INIT_EOF
 
-chmod +x /etc/init.d/nyxta-init
+chmod +x "$OVERLAY_DIR/etc/init.d/nyxta-init"
+ln -s /etc/init.d/nyxta-init "$OVERLAY_DIR/etc/runlevels/default/nyxta-init"
 
-# Copy bootstrap script
-cp /media/mmcblk0p1/nyxta-bootstrap.sh /usr/local/bin/nyxta-bootstrap.sh
-chmod +x /usr/local/bin/nyxta-bootstrap.sh
-
-# Enable the service
-rc-update add nyxta-init default
-
-# Persist changes
-lbu commit -d
-EOF
-chmod +x "${MOUNT_POINT}/apkovl-nyxta.sh"
+(cd "$OVERLAY_DIR" && tar -czf "${MOUNT_POINT}/apkovl.tar.gz" .)
+rm -rf "$OVERLAY_DIR"
 
 echo "--- Configuration complete ---"
 
