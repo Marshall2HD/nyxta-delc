@@ -2,7 +2,7 @@
 #!/usr/bin/env sh
 set -eu
 
-REPO="https://raw.githubusercontent.com/nyxta/run/main"
+REPO="https://raw.githubusercontent.com/Marshall2HD/nyxta-delc/refs/heads/main/"
 SCRIPT="bootstrap.sh"
 
 for arg in "$@"; do
