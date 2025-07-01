@@ -93,22 +93,40 @@ tar -xzf "$IMAGE_FILE" -C "$MOUNT_POINT" --strip-components=0
 
 # 5. Prompt for configuration
 echo "--- Configuring the system ---"
-printf "Enter new root password: "
+
+printf "Enter new root password (input will be hidden): "
+stty -echo
 read -r ROOT_PASSWORD < /dev/tty
-printf "Enter hostname (e.g., nyxta-pi): "
+stty echo
+printf "\n"
+
+printf "Enter hostname (e.g., nyxta-pi, not a fully qualified domain name): "
 read -r HOSTNAME < /dev/tty
+
 printf "Enter SSH public key (paste content or provide a URL like https://github.com/user.keys): "
 read -r SSH_KEY < /dev/tty
 if echo "$SSH_KEY" | grep -q '^https://'; then
   SSH_KEY=$(curl -fsSL "$SSH_KEY")
 fi
-printf "Enter your SOPS AGE private key (it will be stored on the boot partition): "
+
+printf "Enter your SOPS AGE private key (the long string starting with 'AGE-SECRET-KEY-'): "
 read -r SOPS_AGE_KEY < /dev/tty
+
+# Ask to create a new user
+printf "Do you want to create a new non-root user? (y/N): "
+read -r CREATE_USER_CONFIRM < /dev/tty
+if [ "$CREATE_USER_CONFIRM" = "y" ]; then
+    printf "Enter username for the new user: "
+    read -r NEW_USERNAME < /dev/tty
+    printf "Enter password for %s (input will be hidden): " "$NEW_USERNAME"
+    stty -echo
+    read -r NEW_USER_PASSWORD < /dev/tty
+    stty echo
+    printf "\n"
+fi
 
 # 6. Inject configuration
 echo "--- Injecting configuration files ---"
-
-# NOTE: user-conf.yml stores sensitive secrets and is world-readable unless encrypted or removed.
 
 # Create user-conf.yml for Alpine's setup script
 cat > "${MOUNT_POINT}/user-conf.yml" <<EOF
@@ -117,6 +135,8 @@ hostname: ${HOSTNAME}
 password: ${ROOT_PASSWORD}
 ssh_key: "${SSH_KEY}"
 sops_age_key: "${SOPS_AGE_KEY}"
+new_username: "${NEW_USERNAME}"
+new_user_password: "${NEW_USER_PASSWORD}"
 EOF
 
 # Create the init script
