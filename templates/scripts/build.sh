@@ -54,7 +54,7 @@ check_deps() {
     info "Detected OS: $OS"
     
     # Common dependencies
-    for cmd in wget git openssl; do
+    for cmd in curl git openssl; do
         if ! command -v "$cmd" >/dev/null 2>&1; then
             error "$cmd is not installed. Please install it."
         fi
@@ -86,8 +86,8 @@ setup_temp_dir() {
 # 3. & 4. Download Alpine image and hash
 download_alpine() {
     info "Downloading Alpine Linux for RPi..."
-    wget -q --show-progress "$ALPINE_RPI_URL"
-    wget -q --show-progress "${ALPINE_RPI_URL}.sha256"
+    curl -# -L -O "$ALPINE_RPI_URL"
+    curl -# -L -O "${ALPINE_RPI_URL}.sha256"
 }
 
 # 5. Verify the downloaded image
