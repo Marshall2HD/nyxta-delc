@@ -1,62 +1,88 @@
-# bootstrap.sh
-#!/usr/bin/env sh
-set -eu
+#!/bin/sh
 
-ARCH="aarch64"                               # change for armv7 if needed
-ALPINE_VER="3.22.0"
-TARBALL="alpine-rpi-${ALPINE_VER}-${ARCH}.tar.gz"
-MIRROR="https://dl-cdn.alpinelinux.org/alpine/v${ALPINE_VER%.*}/releases/${ARCH}"
-WORK=$(mktemp -d)
-trap 'rm -rf "$WORK"' EXIT INT TERM
+# bootstrap.sh: Script to provision a new Alpine Linux system.
 
-# === prompt ===
-printf "Target block device (e.g. /dev/sdX): "; read DEV
-[ -b "$DEV" ] || { echo "No such block device"; exit 1; }
+set -e # Exit on error
 
-printf "Cluster hostname (FQDN): "; read FQDN
-printf "Root password: "; read -s ROOTPW; echo
-printf "SSH pubkey: "; read SSHKEY
-printf "Age key for SOPS: "; read AGEKEY
+# --- Helper Functions ---
+info() {
+    echo "[INFO] $1"
+}
 
-# === fetch image ===
-echo "→ downloading Alpine rootfs"
-curl -#SL "$MIRROR/$TARBALL" | tar -xz -C "$WORK"
+error() {
+    echo "[ERROR] $1" >&2
+    exit 1
+}
 
-# === configure rootfs ===
-ROOT="$WORK"
-echo "$FQDN"           > "$ROOT/etc/hostname"
-echo "$SSHKEY"         > "$ROOT/root/.ssh/authorized_keys"
-chmod 600 "$ROOT/root/.ssh/authorized_keys"
+# --- Main Logic ---
 
-echo "$AGEKEY"         > "$ROOT/root/.sops/age.key"
-chmod 600 "$ROOT/root/.sops/age.key"
+# 1. Update Alpine
+update_alpine() {
+    info "Updating Alpine packages..."
+    apk update
+    apk upgrade
+}
 
-echo "root:$ROOTPW" | chroot "$ROOT" chpasswd
+# 2. Install dependencies
+install_deps() {
+    info "Installing dependencies..."
+    apk add curl sudo git
+}
 
-chroot "$ROOT" apk add --no-cache openssh chrony k0s kubelet fluxcd sops age
-chroot "$ROOT" rc-update add sshd  default
-chroot "$ROOT" rc-update add chronyd default
-chroot "$ROOT" rc-update add k0scontroller default
+# 21.5 Set up chrony
+setup_chrony() {
+    info "Setting up chrony for time synchronization..."
+    apk add chrony
+    rc-update add chronyd default
+    rc-service chronyd start
+}
 
-cat > "$ROOT/etc/network/interfaces" <<EOF
-auto lo
-iface lo inet loopback
+# 2. Install K0s, etc.
+install_k0s() {
+    info "Installing k0s..."
+    curl -sSLf https://get.k0s.sh | sh
+    k0s install controller --single
+    k0s start
+    
+    # Wait for k0s to be ready
+    info "Waiting for k0s to become ready..."
+    sleep 60 # Give it some time to start up
+    
+    export KUBECONFIG=/var/lib/k0s/pki/admin.conf
+    
+    # Verify cluster is ready
+    until k0s kubectl get nodes -o jsonpath='{.items[0].status.conditions[?(@.type=="Ready")].status}' | grep -q "True"; do
+      info "Waiting for node to be ready..."
+      sleep 10
+    done
+    info "k0s cluster is ready."
+}
 
-auto eth0
-iface eth0 inet dhcp
-EOF
+# 3. Download repo
+download_repo() {
+    info "Cloning configuration repository..."
+    if [ -d "/aether/nyxta-alpine" ]; then
+        info "Removing existing repository to ensure a clean clone."
+        rm -rf "/aether/nyxta-alpine"
+    fi
+    git clone https://github.com/Marshall2HD/nyxta-delc.git /aether/nyxta-alpine
+}
 
-# === write to disk ===
-echo "→ wiping $DEV & writing image"
-sgdisk --zap-all "$DEV"
-dd if=/dev/zero of="$DEV" bs=1M count=10 status=progress
-parted -s "$DEV" mklabel gpt mkpart primary ext4 1MiB 100%
-mkfs.ext4 -F "${DEV}1"
+# --- Script Execution ---
+main() {
+    info "Starting bootstrap process..."
+    
+    update_alpine
+    install_deps
+    setup_chrony
+    install_k0s
+    download_repo
+    
+    info "Bootstrap process complete."
+    info "The system is now provisioned."
 
-MNT=$(mktemp -d)
-mount "${DEV}1" "$MNT"
-cp -a "$ROOT"/* "$MNT"
-umount "$MNT"
-sync
+    # Disable this script from running again
+    rm -- "$0"
+}
 
-echo "✓ bootstrap complete – insert card and boot Pi"
+main
