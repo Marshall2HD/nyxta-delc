@@ -106,7 +106,7 @@ verify_image() {
 list_disks() {
     info "Available disks:"
     if [ "$OS" = "Mac" ]; then
-        diskutil list external | grep -E '(\*|/dev/disk)'
+        diskutil list external
     else
         lsblk -d -o NAME,SIZE,MODEL
     fi
