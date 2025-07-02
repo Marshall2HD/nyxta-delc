@@ -129,8 +129,12 @@ select_disk() {
 
     local is_valid=false
     if [ "$OS" = "Mac" ]; then
+        # Normalize disk identifier for diskutil, e.g., /dev/disk4 -> disk4
+        local disk_id
+        disk_id=$(basename "$selected_disk")
+        
         # Ensure it's a whole disk, not a partition
-        if diskutil info "$selected_disk" 2>/dev/null | grep -q "Whole: Yes"; then
+        if diskutil info "$disk_id" 2>/dev/null | grep -q "Whole: Yes"; then
             is_valid=true
         fi
     else # Linux
