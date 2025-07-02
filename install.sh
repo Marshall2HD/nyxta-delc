@@ -22,12 +22,12 @@ error() {
 main() {
     if [ "$1" = "--build" ]; then
         info "Starting build process..."
-        curl -fsSL "$BUILD_SCRIPT_URL" | sh
+        curl -fsSL "$BUILD_SCRIPT_URL" | sh -s -- "$@"
     else
         info "Starting bootstrap process..."
         # This part is intended to be run on the Alpine machine itself.
         # The primary use case is via the local.d service setup in build.sh
-        curl -fsSL "$BOOTSTRAP_SCRIPT_URL" | sh
+        curl -fsSL "$BOOTSTRAP_SCRIPT_URL" | sh -s -- "$@"
     fi
 }
 
