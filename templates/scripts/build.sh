@@ -24,21 +24,23 @@ error() {
 }
 
 prompt() {
-    # Print prompt to stderr to avoid capture by command substitution
+    # Print prompt to stderr to avoid capture by command substitution.
     printf "[PROMPT] %s" "$1" >&2
-    read -r response || true
+    # Read from the controlling terminal, not from stdin which might be piped.
+    read -r response < /dev/tty || true
     echo "$response"
 }
 
 confirm() {
     while true; do
-        # Use stderr for the prompt as well
+        # Use stderr for the prompt.
         printf "[CONFIRM] %s [y/n] " "$1" >&2
-        read -r yn || yn="n" # Default to 'n' on read error/EOF
+        # Read from the controlling terminal.
+        read -r yn < /dev/tty || yn="n" # Default to 'n' on read error/EOF
         case $yn in
             [Yy]* ) return 0;;
             [Nn]* ) return 1;;
-            * ) echo "Please answer yes or no.";;
+            * ) echo "Please answer yes or no." >&2;;
         esac
     done
 }
