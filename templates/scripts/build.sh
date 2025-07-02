@@ -24,14 +24,16 @@ error() {
 }
 
 prompt() {
-    printf "[PROMPT] %s" "$1"
+    # Print prompt to stderr to avoid capture by command substitution
+    printf "[PROMPT] %s" "$1" >&2
     read -r response || true
     echo "$response"
 }
 
 confirm() {
     while true; do
-        printf "[CONFIRM] %s [y/n] " "$1"
+        # Use stderr for the prompt as well
+        printf "[CONFIRM] %s [y/n] " "$1" >&2
         read -r yn || yn="n" # Default to 'n' on read error/EOF
         case $yn in
             [Yy]* ) return 0;;
@@ -94,11 +96,12 @@ download_alpine() {
 # 5. Verify the downloaded image
 verify_image() {
     info "Verifying image checksum..."
+    local checksum_file="alpine-rpi-${ALPINE_VERSION}-${ALPINE_ARCH}.tar.gz.sha256"
     if [ "$OS" = "Mac" ]; then
-        expected_hash=$(cut -d ' ' -f 1 "alpine-rpi-${ALPINE_VERSION}-${ALPINE_ARCH}.tar.gz.sha256")
-        echo "$expected_hash  alpine-rpi-${ALPINE_VERSION}-${ALPINE_ARCH}.tar.gz" | shasum -a 256 -c -
+        # shasum is the macOS equivalent of sha256sum; -c checks the hash
+        shasum -a 256 -c "$checksum_file"
     else
-        sha256sum -c "alpine-rpi-${ALPINE_VERSION}-${ALPINE_ARCH}.tar.gz.sha256"
+        sha256sum -c "$checksum_file"
     fi
     info "Checksum verified."
 }
@@ -124,7 +127,8 @@ select_disk() {
 
     local is_valid=false
     if [ "$OS" = "Mac" ]; then
-        if diskutil info "$selected_disk" >/dev/null 2>&1; then
+        # Ensure it's a whole disk, not a partition
+        if diskutil info "$selected_disk" 2>/dev/null | grep -q "Whole: Yes"; then
             is_valid=true
         fi
     else # Linux
@@ -137,7 +141,7 @@ select_disk() {
     fi
 
     if [ "$is_valid" = "false" ]; then
-        error "Invalid disk selected: $selected_disk"
+        error "Invalid or non-whole disk selected: $selected_disk. Please select a whole disk device."
     fi
 
     if ! confirm "Are you sure you want to format and install to $selected_disk? THIS IS DESTRUCTIVE."; then
@@ -338,11 +342,11 @@ EOF
 
 cleanup() {
     info "Cleaning up..."
-    if [ -d "$MOUNT_POINT" ] && (mount | grep -q "$MOUNT_POINT" || (df -h | grep -q "$MOUNT_POINT" 2>/dev/null)); then
+    if [ -n "$MOUNT_POINT" ] && [ -d "$MOUNT_POINT" ] && (mount | grep -q "$MOUNT_POINT" || (df -h | grep -q "$MOUNT_POINT" 2>/dev/null)); then
         info "Unmounting $MOUNT_POINT..."
         sudo umount "$MOUNT_POINT" || true
     fi
-    if [ -d "$TEMP_DIR" ]; then
+    if [ -n "$TEMP_DIR" ] && [ -d "$TEMP_DIR" ]; then
         rm -rf "$TEMP_DIR"
     fi
     info "Done."
