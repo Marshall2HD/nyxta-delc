@@ -25,13 +25,14 @@ error() {
 
 prompt() {
     printf "[PROMPT] %s" "$1"
-    read -r response
+    read -r response || true
     echo "$response"
 }
 
 confirm() {
     while true; do
-        read -p "[CONFIRM] $1 [y/n] " yn
+        printf "[CONFIRM] %s [y/n] " "$1"
+        read -r yn || yn="n" # Default to 'n' on read error/EOF
         case $yn in
             [Yy]* ) return 0;;
             [Nn]* ) return 1;;
@@ -116,9 +117,29 @@ list_disks() {
 select_disk() {
     list_disks
     selected_disk=$(prompt "Enter the disk to write the image to (e.g., /dev/sda or /dev/disk2): ")
-    if [ ! -b "$selected_disk" ] && [ ! -c "$selected_disk" ]; then
+
+    if [ -z "$selected_disk" ]; then
+        error "No disk selected. Aborting."
+    fi
+
+    local is_valid=false
+    if [ "$OS" = "Mac" ]; then
+        if diskutil info "$selected_disk" >/dev/null 2>&1; then
+            is_valid=true
+        fi
+    else # Linux
+        # Normalize to device name only, e.g. /dev/sda -> sda
+        local disk_name
+        disk_name=$(basename "$selected_disk")
+        if lsblk -d -n -o NAME | grep -q "^${disk_name}$"; then
+            is_valid=true
+        fi
+    fi
+
+    if [ "$is_valid" = "false" ]; then
         error "Invalid disk selected: $selected_disk"
     fi
+
     if ! confirm "Are you sure you want to format and install to $selected_disk? THIS IS DESTRUCTIVE."; then
         error "Installation aborted by user."
     fi
