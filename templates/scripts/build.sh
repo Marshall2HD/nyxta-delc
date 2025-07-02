@@ -66,7 +66,7 @@ check_deps() {
                 error "$cmd is not installed. Please install it."
             fi
         done
-    elif [ "$OS" = "Mac" ];
+    elif [ "$OS" = "Mac" ]; then
         if ! command -v "diskutil" >/dev/null 2>&1 || ! command -v "shasum" >/dev/null 2>&1; then
             error "macOS command line tools (diskutil, shasum) not found. Please install them."
         fi
